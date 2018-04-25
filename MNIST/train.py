@@ -6,6 +6,9 @@ import numpy as np
 import time
 import imageio
 from helper import *
+from glob import glob
+
+from input_pipeline import input_pipeline
 
 # training parameters
 batch_size = 100
@@ -13,8 +16,16 @@ lr = 0.0002
 train_epoch = 20
 
 # load MNIST
-mnist = input_data.read_data_sets("/home/mikep/DataSets/MNIST/", one_hot=True, reshape=[])
+#mnist = input_data.read_data_sets("/home/mikep/DataSets/MNIST/", one_hot=True, reshape=[])
 
+dataset_dir = '/home/mikep/DataSets/MNIST/tfrecord'
+
+dataset = glob(dataset_dir + "/*")
+dataset.sort()
+
+imgs, labels = input_pipeline(train_shards=dataset, batch_size=batch_size, num_preprocess_threads=4, num_gpus=3)
+
+"""
 # variables : input
 x = tf.placeholder(tf.float32, shape=(None, 64, 64, 1))
 z = tf.placeholder(tf.float32, shape=(None, 1, 1, 100))
@@ -118,5 +129,4 @@ for e in range(train_epoch):
     img_name = root + 'Fixed_results/' + model + str(e + 1) + '.png'
     images.append(imageio.imread(img_name))
 imageio.mimsave(root + model + 'generation_animation.gif', images, fps=5)
-
-sess.close()
+"""

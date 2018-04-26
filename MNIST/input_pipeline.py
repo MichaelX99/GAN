@@ -98,7 +98,7 @@ def input_pipeline(train_shards, batch_size=None, num_preprocess_threads=None, n
     with tf.device('/cpu:0'):
         images, labels = process(train_shards, batch_size, num_preprocess_threads, num_gpus)
 
-    return images, labels
+    return images, tf.random_normal([batch_size, 1, 1, 100]), labels
 """
 def inputs(dataset, batch_size=None, num_preprocess_threads=None):
   # Force all input processing onto CPU in order to reserve the GPU for

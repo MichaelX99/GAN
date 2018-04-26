@@ -1,10 +1,10 @@
 import tensorflow as tf
-from tensorflow.examples.tutorials.mnist import input_data
-from model import *
-import os
-import numpy as np
-import time
-import imageio
+#from tensorflow.examples.tutorials.mnist import input_data
+#from model import *
+#import os
+#import numpy as np
+#import time
+#import imageio
 from helper import *
 from glob import glob
 
@@ -14,16 +14,88 @@ from input_pipeline import input_pipeline
 batch_size = 100
 lr = 0.0002
 train_epoch = 20
+num_gpus = 3
 
 # load MNIST
 #mnist = input_data.read_data_sets("/home/mikep/DataSets/MNIST/", one_hot=True, reshape=[])
 
+# Directory for the MNIST dataset
 dataset_dir = '/home/mikep/DataSets/MNIST/tfrecord'
 
+# Aquire all the sharded tfrecord files
 dataset = glob(dataset_dir + "/*")
 dataset.sort()
 
-imgs, labels = input_pipeline(train_shards=dataset, batch_size=batch_size, num_preprocess_threads=4, num_gpus=3)
+# Generate the input pipeline
+imgs, noise, labels = input_pipeline(train_shards=dataset, batch_size=batch_size, num_preprocess_threads=4, num_gpus=num_gpus)
+batch_queue = tf.contrib.slim.prefetch_queue.prefetch_queue([imgs, noise, labels], capacity=2 * num_gpus)
+
+tower_grads = []
+with tf.variable_scope(tf.get_variable_scope()):
+    for i in range(num_gpus):
+        with tf.device('/gpu:%d' % i):
+            with tf.name_scope('%s_%d' % ("tower", i)) as scope:
+                # Get this gpu's data
+                image_batch, noise_batch, label_batch = batch_queue.dequeue()
+
+                loss = tower_loss(image_batch, noise_batch, label_batch)
+
+                # Retain the summaries from the final tower.
+                summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
+
+                tf.get_variable_scope().reuse_variables()
+
+                # Compute the gradients
+                #grads = opt.compute_gradients(loss)
+
+                #tower_grads.append(grads)
+
+
+class Trainer():
+    def __init__(self, dataset_dir):
+        self.dataset_dir = dataset_dir
+
+        # Aquire all the sharded tfrecord files
+        self.dataset = glob(dataset_dir + "/*")
+        self.dataset.sort()
+
+        # Form the optimizers
+        lr = 0.0002
+        self.D_optim = tf.train.AdamOptimizer(lr, beta1=0.5)
+        self.G_optim = tf.train.AdamOptimizer(lr, beta1=0.5)
+
+        self.num_gpus = 3
+        self.batch_size = 100
+
+    def form_input_pipeline(self):
+        self.imgs, self.noise, self.labels = input_pipeline(train_shards=self.dataset,
+                                                            batch_size=self.batch_size,
+                                                            num_preprocess_threads=4,
+                                                            num_gpus=self.num_gpus)
+
+        self.batch_queue = tf.contrib.slim.prefetch_queue.prefetch_queue([self.imgs, self.noise, self.labels], capacity=2 * self.num_gpus)
+
+    def build_GAN(self):
+        self.tower_grads = []
+        with tf.variable_scope(tf.get_variable_scope()):
+            for i in range(self.num_gpus):
+                with tf.device('/gpu:%d' % i):
+                    with tf.name_scope('%s_%d' % ("tower", i)) as scope:
+                        # Get this gpu's data
+                        image_batch, noise_batch, label_batch = self.batch_queue.dequeue()
+
+                        # Create the generator graph
+                        G_z = generator(noise_batch)
+
+                        # Create the discriminator graphs
+                        D_real, D_real_logits = discriminator(image_batch)
+                        D_fake, D_fake_logits = discriminator(G_z, reuse=True)
+
+                        generator_loss, discriminator_loss = self.compute_loss(G_z, D_real, D_real_logits, D_fake, D_fake_logits, label_batch)
+
+
+    def compute_loss(self, G_z, D_real, D_real_logits, D_fake, D_fake_logits, label_batch):
+        pass
 
 """
 # variables : input

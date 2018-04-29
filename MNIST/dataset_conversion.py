@@ -243,6 +243,8 @@ def main():
             imsave(img_save_dir + str(i) + ".jpg", train_data[i][:,:,0])
             writer.writerow([str(i) + ".jpg", train_labels[i]])
 
+    print("Done saving images")
+
     # Generate TFRecord files of the data
     tfrecord_dir = Dataset_dir + "tfrecord/"
     if not os.path.isdir(tfrecord_dir):

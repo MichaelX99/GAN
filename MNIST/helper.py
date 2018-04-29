@@ -2,6 +2,50 @@ import numpy as np
 import matplotlib.pyplot as plt
 import itertools
 
+import tensorflow as tf
+
+def variable_on_cpu(name, shape, initializer):
+    with tf.device('/cpu:0'):
+        dtype = tf.float32
+        var = tf.get_variable(name, shape, initializer=initializer, dtype=dtype)
+    return var
+
+
+def variable_with_weight_decay(name, shape, wd):
+    dtype = tf.float32
+    var = variable_on_cpu(
+                        name,
+                        shape,
+                        tf.contrib.layers.variance_scaling_initializer())
+    return var
+
+def convolution(conv, shape, decay, stride, in_scope, is_training):
+    with tf.variable_scope(in_scope) as scope:
+        kernel = variable_with_weight_decay('weights',
+                                            shape=shape,
+                                            wd=decay)
+
+        conv = tf.nn.conv2d(conv, kernel, [1, stride, stride, 1], padding='SAME')
+
+    return conv
+
+def convolution_transpose(conv, kernel_size, out_channels, stride, in_scope, padding='SAME'):
+    with tf.variable_scope(in_scope) as scope:
+        in_channels = conv.get_shape().as_list()[3]
+        shape = [kernel_size, kernel_size, in_channels, out_channels]
+
+        initializer = tf.contrib.layers.variance_scaling_initializer()
+        kernel = variable_on_cpu('weights', shape, initializer)
+        """
+        kernel = variable_with_weight_decay('weights',
+                                            shape=shape,
+                                            wd=decay)
+        """
+
+        conv = tf.nn.conv2d(conv, kernel, [1, stride, stride, 1], padding=padding)
+
+    return conv
+
 fixed_z_ = np.random.normal(0, 1, (25, 1, 1, 100))
 def show_result(sess, G_z, z, isTrain, num_epoch, show = False, save = False, path = 'result.png'):
 #def show_result(num_epoch, show = False, save = False, path = 'result.png'):
